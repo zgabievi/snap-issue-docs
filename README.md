@@ -46,14 +46,29 @@ The Chrome Web Store build (`pnpm --filter @snap-issue/extension zip:store`) lea
 
 ## Sign in to GitHub
 
-Snap Issue files issues through a GitHub App with the device flow. The app's Client ID is committed in `packages/extension/lib/github/config.ts`.
+Snap Issue files issues through a GitHub App with the device flow. The app's Client ID is committed in `packages/extension/lib/trackers/github/config.ts`.
 
 - **Using the team's app:** open the options page and click **Sign in with GitHub**. The app must be installed on the repos you want to file into.
 - **Creating your own app:** follow [docs/github-app-setup.md](docs/github-app-setup.md) (exact permissions, installing the app on repos), put the new Client ID in the config file and rebuild. With an empty Client ID the options page shows "Client ID not configured".
 
+## Connect Jira, Linear, Asana or Trello
+
+Open the options page and find the tracker under **Trackers**. Each one connects with a token you create in the tracker; the form links to the page where you make it. Saving asks Chrome for access to that tracker's API, checks the token with one call and shows "Connected as <your name>", or why it was refused.
+
+| Tracker | What you enter | Where you create it |
+| --- | --- | --- |
+| Jira Cloud | Your site (`https://<name>.atlassian.net`), the email you sign in to Atlassian with, and an API token | [Atlassian API tokens](https://id.atlassian.com/manage-profile/security/api-tokens). Choose **Create API token**, not the one with scopes. Tokens expire within a year. |
+| Linear | A personal API key | [Linear, Settings, Security & access](https://linear.app/settings/account/security). Give it Read, Create issues and Create comments for the teams you file to. |
+| Asana | A personal access token | [Asana developer console](https://app.asana.com/0/my-apps), **Create new token**. |
+| Trello | Your API key and token | [Trello Power-Ups admin](https://trello.com/apps/admin): open or create a Power-Up, generate an API key on its **Trello Auth** tab, then follow the **Token** link next to it and click **Allow**. |
+
+Tokens stay in this browser's local storage (never synced) and go only to their tracker. **Disconnect** deletes them. If a token is revoked or expires, filing shows **Reconnect**: paste a new one in Options.
+
+A build whose `lib/trackers/publish-config.ts` has a tracker's OAuth app (see [docs/trackers-setup.md](docs/trackers-setup.md)) also shows a one-click **Connect** button, with "Use an API token instead" below it. Whichever you connect last is used.
+
 ## Local helper (Claude Code and Codex with your own login)
 
-The "Claude (local)" and "Codex (local)" AI providers run the `claude` and `codex` CLIs on your computer through a native messaging helper (`com.snapissue.helper`), so they use your Claude subscription or ChatGPT login instead of an API key. macOS and Linux only. You need at least one of the two CLIs.
+The "Claude (local)" and "Codex (local)" AI providers run the `claude` and `codex` CLIs on your computer through a native messaging helper (`com.snapissue.helper`), so they use your Claude subscription or ChatGPT login instead of an API key. It runs on macOS, Linux and Windows. You need at least one of the two CLIs.
 
 1. Install the CLIs you want and sign in once:
    - **Claude Code**: install [Claude Code](https://docs.claude.com/en/docs/claude-code) and run `claude` in a terminal to sign in.
@@ -67,7 +82,9 @@ The "Claude (local)" and "Codex (local)" AI providers run the `claude` and `code
 
    This builds the helper, copies it to `~/.snap-issue/helper/` with a launcher that uses the absolute `node` path, records the absolute paths of `claude` and `codex` in `config.json` there, and writes the host manifest for Chrome (`~/Library/Application Support/Google/Chrome/NativeMessagingHosts/` on macOS, `~/.config/google-chrome/NativeMessagingHosts/` on Linux). Add `--browser chromium` or `--browser chrome-for-testing` (repeatable) for other browsers.
 
-   Each CLI is looked up on your `PATH`, then in the usual install locations: for `claude`, `~/.local/bin`, `~/.claude/local`, `/opt/homebrew/bin` and `/usr/local/bin`; for `codex`, the ChatGPT app (`/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex`), `~/.codex/plugins/.plugin-appserver/codex-cli/bin/codex`, `/opt/homebrew/bin` and `/usr/local/bin`. A path you put in `config.json` by hand is kept when you reinstall.
+   On Windows the helper lives in `%USERPROFILE%\.snap-issue\helper\`, the launcher is `snap-issue-helper.bat`, and the manifest sits next to it. Chrome finds it through the registry key `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.snapissue.helper` (`HKCU\Software\Chromium\…` and `HKCU\Software\Google\Chrome for Testing\…` for the other browsers), whose default value is the manifest path. Run the command from PowerShell or Command Prompt, not WSL.
+
+   Each CLI is looked up on your `PATH`, then in the usual install locations: for `claude`, `~/.local/bin`, `~/.claude/local`, `/opt/homebrew/bin` and `/usr/local/bin`; for `codex`, the ChatGPT app (`/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex`), `~/.codex/plugins/.plugin-appserver/codex-cli/bin/codex`, `/opt/homebrew/bin` and `/usr/local/bin`. On Windows, `PATH` is searched with your `PATHEXT` extensions (`.exe` before `.cmd`), then `%USERPROFILE%\.local\bin\claude.exe`, `%LOCALAPPDATA%\Microsoft\WinGet\Links` and npm's `%APPDATA%\npm` (the helper runs npm's `.cmd` shims through `cmd.exe`). A path you put in `config.json` by hand is kept when you reinstall.
 4. Reload the extension. The options page's **Status** panel shows whether the helper is reachable and, for each CLI, whether it was found and is signed in (from `claude auth status` and `codex login status`).
 
 Run the command again after pulling helper changes or installing a CLI somewhere new. Each generate runs in a temporary directory that is deleted afterwards and keeps no session: `claude -p` with no tools, or `codex exec` in a read-only sandbox. It is stopped after 120 seconds or when you click Cancel.
